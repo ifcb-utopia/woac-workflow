@@ -2,8 +2,8 @@ import pandas as pd
 from pathlib import Path
 
 
-tsg_folder = Path('Sept2025/WOAC fall 2025 ship data/scs/SEAWATER')  # Folder containing your TSG files
-output_file = 'Sept2025/combined_tsg_data.xlsx'  # Output file name
+tsg_folder = Path('/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/RC0148scs/SEAWATER')  # Folder containing TSG files
+output_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/combined_tsg_data.xlsx'  # Output file name
 
 tsg_files = sorted([f for f in tsg_folder.glob('*.Raw') if 'SBEInterfaceBox' in f.name])  #SSW-TSG
 

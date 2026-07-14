@@ -1,10 +1,29 @@
 import pandas as pd
 from pathlib import Path
 
+
+def dmm_to_dd(dmm, hemisphere=None):
+    if pd.isna(dmm):
+        return pd.NA
+
+    value = float(dmm)
+    if abs(value) >= 100:
+        degrees = int(abs(value) // 100)
+        minutes = abs(value) - (degrees * 100)
+        dd = degrees + (minutes / 60)
+    else:
+        dd = value
+
+    if hemisphere in ['S', 's', 'W', 'w']:
+        dd = -dd
+
+    return dd
+
+
 # Folder containing your GPS files
-gps_folder = Path('Sept2025/WOAC fall 2025 ship data/scs/NAV')
+gps_folder = Path('/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/RC0148scs/NAV_GP33')
 # Output file name
-output_file = 'Sept2025/combined_gps_data.xlsx'
+output_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/combined_gps_data.xlsx'
 
 # Look for GPS GGA files with 'GP33-GGA' in filename
 gps_files = sorted([f for f in gps_folder.glob('*.Raw') if 'GP33-GGA' in f.name])
@@ -26,7 +45,9 @@ for file in gps_files:
                 # Skip lines with empty lat/lon
                 if lat and lon:
                     datetime = pd.to_datetime(f'{date} {time}', format='%m/%d/%Y %H:%M:%S.%f', errors='coerce')
-                    all_rows.append([datetime, date, time, lat, lat_hem, lon, lon_hem])
+                    lat_dd = dmm_to_dd(lat, lat_hem)
+                    lon_dd = dmm_to_dd(lon, lon_hem)
+                    all_rows.append([datetime, date, time, lat_dd, lat_hem, lon_dd, lon_hem])
 
 # Create DataFrame
 combined_df = pd.DataFrame(all_rows, columns=['Datetime', 'date', 'time', 'lat', 'lat_hem', 'lon', 'lon_hem'])

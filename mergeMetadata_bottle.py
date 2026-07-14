@@ -1,10 +1,49 @@
+import re
 import pandas as pd
 
+
+def dmm_to_dd(value):
+    if pd.isna(value):
+        return float('nan')
+
+    text = str(value).strip()
+    if not text:
+        return float('nan')
+
+    hemisphere = None
+    if text[-1].upper() in ['N', 'S', 'E', 'W']:
+        hemisphere = text[-1].upper()
+        text = text[:-1].strip()
+
+    if re.match(r'^[-+]?\d+(?:\.\d+)?$', text):
+        numeric = float(text)
+    else:
+        parts = text.replace(',', ' ').split()
+        if len(parts) >= 2:
+            try:
+                degrees = int(float(parts[0]))
+                minutes = float(parts[1])
+            except (ValueError, TypeError):
+                return float('nan')
+
+            numeric = degrees + (minutes / 60)
+        else:
+            try:
+                numeric = float(text)
+            except (ValueError, TypeError):
+                return float('nan')
+
+    if hemisphere in ['S', 'W']:
+        numeric = -numeric
+
+    return numeric
+
+
 # === User Inputs ===
-metadata_file = 'Sept2025/WOAC-Sept2025-metadata_edit_GPS_TSG.xlsx'     # text file with IFCB sample timestamps and bottle info
-bottle_file = 'Sept2025/September_2025_btl.csv'             # text file with bottle times, locations, water condition
-output_file = 'Sept2025/WOAC-Sept2025-metadata_merged.xlsx'  # output file name
-ecotaxa_file = 'Sept2025/EcoTaxa/WOAC-Sept2025-metadata_merged-toEcotaxa.xlsx'  # text file with Ecotaxa data (if needed)
+metadata_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/WOAC-Apr2026-metadata_edit_GPS_TSG.xlsx'     # text file with IFCB sample timestamps and bottle info
+bottle_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/April_2026_btl.csv'             # text file with bottle times, locations, water condition
+output_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/WOAC-Apr2026-metadata_merged.xlsx'  # output file name
+ecotaxa_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/EcoTaxa/WOAC-Apr2026-metadata_merged-toEcotaxa.xlsx'  # text file with Ecotaxa data (if needed)
 
 # Load IFCB metadata file
 metadata_df = pd.read_excel(metadata_file)
@@ -13,6 +52,19 @@ metadata_df = pd.read_excel(metadata_file)
 metadata_df['datetime'] = pd.to_datetime(metadata_df['DateTime'], errors='coerce', utc=True)  # coerce bad values to NaT
 metadata_df['datetime_local'] = metadata_df['datetime'].dt.tz_convert('America/Los_Angeles')
 metadata_df['merge_date'] = metadata_df['datetime_local'].dt.strftime('%m/%d/%y')
+
+# If Latitude/Longitude columns are missing, build them from NMEA degree-decimal-minute values.
+if 'Latitude' not in metadata_df.columns or 'Longitude' not in metadata_df.columns:
+    if 'NMEAlat' in metadata_df.columns:
+        metadata_df['Latitude'] = metadata_df['NMEAlat'].apply(dmm_to_dd)
+    else:
+        metadata_df['Latitude'] = float('nan')
+
+    if 'NMEANlon' in metadata_df.columns:
+        metadata_df['Longitude'] = metadata_df['NMEANlon'].apply(dmm_to_dd)
+    else:
+        metadata_df['Longitude'] = float('nan')
+
 # Remove decimal part *only if* the value is a whole number and not NaN
 metadata_df['Bottle'] = (
     metadata_df['Bottle']
@@ -61,6 +113,18 @@ bottle_df['Bottle'] = bottle_df['Bottle'].astype(str).str.strip()
 metadata_df['merge_date'] = metadata_df['merge_date'].astype(str).str.strip()
 bottle_df['merge_date'] = bottle_df['merge_date'].astype(str).str.strip()
 
+# If bottle coordinates are missing, build them from NMEA degree-decimal-minute values.
+if 'Latitude' not in bottle_df.columns or 'Longitude' not in bottle_df.columns:
+    if 'NMEAlat' in bottle_df.columns:
+        bottle_df['Latitude'] = bottle_df['NMEAlat'].apply(dmm_to_dd)
+    else:
+        bottle_df['Latitude'] = float('nan')
+
+    if 'NMEANlon' in bottle_df.columns:
+        bottle_df['Longitude'] = bottle_df['NMEANlon'].apply(dmm_to_dd)
+    else:
+        bottle_df['Longitude'] = float('nan')
+
 # Extract latitude and longitude from bottle_df for later use
 bottle_coords = bottle_df[['merge_date', 'Bottle', 'Station', 'Latitude', 'Longitude']].copy()
 bottle_coords.columns = bottle_coords.columns.str.strip()  # ensure no spaces
@@ -86,9 +150,9 @@ coords_merged = pd.merge(
     suffixes=('', '_bottle')
 )
 
-# Update the existing Latitude and Longitude columns with bottle values where available
-merged_df['Latitude'] = coords_merged['Latitude_bottle'].fillna(merged_df['Latitude'])
-merged_df['Longitude'] = coords_merged['Longitude_bottle'].fillna(merged_df['Longitude'])
+# Prefer bottle-derived Latitude and Longitude values when they are available.
+merged_df['Latitude'] = coords_merged['Latitude_bottle'].combine_first(merged_df['Latitude'])
+merged_df['Longitude'] = coords_merged['Longitude_bottle'].combine_first(merged_df['Longitude'])
 
 # Ensure Temperature and Salinity from metadata are preserved in the final output
 # These columns should already be present from the metadata_df (GPS_TSG file)
@@ -102,11 +166,15 @@ if 'Type' in merged_df.columns and 'NMEAtimeUTC' in merged_df.columns:
     niskin_mask = merged_df['Type'].str.lower() == 'niskin'
     merged_df.loc[niskin_mask, 'CollectionTime'] = merged_df.loc[niskin_mask, 'NMEAtimeUTC']
 
-# Copy DepSM values into Depth column when values exist, and round to nearest integer
-if 'DepSM' in merged_df.columns and 'Depth' in merged_df.columns:
-    # Fill Depth with DepSM values where DepSM is not null
-    depth_mask = merged_df['DepSM'].notna()
-    merged_df.loc[depth_mask, 'Depth'] = merged_df.loc[depth_mask, 'DepSM'].round().astype(int)
+# Copy DepSM values into Depth column when values exist, and round to nearest integer.
+# Also default inline-type rows to a depth of 2.
+if 'Depth' in merged_df.columns:
+    if 'DepSM' in merged_df.columns:
+        depth_mask = merged_df['DepSM'].notna()
+        merged_df.loc[depth_mask, 'Depth'] = merged_df.loc[depth_mask, 'DepSM'].round().astype(int)
+
+    inline_mask = merged_df['Type'].astype(str).str.lower() == 'inline' if 'Type' in merged_df.columns else pd.Series(False, index=merged_df.index)
+    merged_df.loc[inline_mask, 'Depth'] = 2
 
 # Remove timezone information from datetime columns before saving to Excel
 for col in merged_df.columns:

@@ -5,7 +5,7 @@ import pandas as pd
 # Subsequently, the file can be merged with ship GPS and bottle TSG data to create a comprehensive metadata file.
 
 # Specify the directory path of the raw IFCB data
-directory = '/Users/AIRS Shared Lab/OneDrive - UW/IFCB216/raw/TallShip2025/raw_db' #'C:/Users/AIRS Shared Lab/OneDrive - UW/IFCB216/raw/WOAC_sept25/raw_db'
+directory = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/IFCB216/raw/WOAC_apr26' #'C:/Users/AIRS Shared Lab/OneDrive - UW/IFCB216/raw/WOAC_sept25/raw_db'
 
 # Get all file names in the directory
 file_names = os.listdir(directory)
@@ -64,4 +64,4 @@ df = df.drop(columns=['date_str', 'time_str', 'date_time_str'])
 print(df)
 
 # Save the DataFrame to an excel file
-df.to_excel('/Users/AIRS Shared Lab/OneDrive - UW/IFCB216/Tall Ship Cruise Oct 2025/SL2025-metadata.xlsx', index=False)
+df.to_excel('/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/WOAC-Apr2026-metadata.xlsx', index=False)

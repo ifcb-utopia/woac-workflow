@@ -9,11 +9,11 @@ import os
 # When there is information in the CollectionTime column of the metadata file, it will be used to match with the GPS data.
 
 # === User Inputs ===
-gps_file = 'Sept2025/combined_gps_data.xlsx'             # text file with date, time, lat, lon
-tsg_file = 'Sept2025/combined_tsg_data.xlsx'             # text file with TSG data
-sample_file = 'Sept2025/WOAC-Sept2025-metadata_edit.xlsx'     # text file with sample timestamps
+gps_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/combined_gps_data.xlsx'             # text file with date, time, lat, lon
+tsg_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/combined_tsg_data.xlsx'             # text file with TSG data
+sample_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/WOAC-Apr2026-metadata_edit.xlsx'     # text file with sample timestamps
 sample_time_col = 'DateTime'        # name of the timestamp column in Excel
-output_file = 'Sept2025/WOAC-Sept2025-metadata_edit_GPS_TSG.xlsx'  # output file name
+output_file = '/Users/alisonchase/Library/CloudStorage/OneDrive-UW/SalishSea_WOAC/IFCB/April2026/WOAC-Apr2026-metadata_edit_GPS_TSG.xlsx'  # output file name
 
 # === Load GPS data ===
 # Adjust delimiter if needed (e.g., ',' or '\t')
@@ -24,11 +24,20 @@ tsg_df = pd.read_excel(tsg_file)
 tsg_df['datetime'] = pd.to_datetime(tsg_df['Datetime'], errors='coerce')
 
 def dmm_to_dd(dmm, hemisphere=None):
-    deg = int(dmm) // 100
-    minutes = dmm - (deg * 100)
-    dd = deg + (minutes / 60)
-    if hemisphere in ['S', 'W']:
+    if pd.isna(dmm):
+        return np.nan
+
+    value = float(dmm)
+    if abs(value) >= 100:
+        degrees = int(abs(value) // 100)
+        minutes = abs(value) - (degrees * 100)
+        dd = degrees + (minutes / 60)
+    else:
+        dd = value
+
+    if hemisphere in ['S', 's', 'W', 'w']:
         dd = -dd
+
     return dd
 
 gps_df['lat_dd'] = gps_df.apply(lambda row: dmm_to_dd(row['lat'], row.get('lat_hem')), axis=1)
