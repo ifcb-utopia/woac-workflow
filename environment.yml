@@ -1,0 +1,9 @@
+name: woac-workflow
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - openpyxl
+  - pandas
+  - python-dateutil
