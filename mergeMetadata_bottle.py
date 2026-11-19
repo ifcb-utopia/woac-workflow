@@ -6,7 +6,8 @@ import os
 # This script merges IFCB metadata with bottle data from CTD casts.
 # It handles GPS coordinates, timestamps, and ensures proper formatting for merging.
 # Usage:
-# python mergeMetadata_bottle.py metadata.xlsx bottle.csv output.xlsx [ecotaxa_output.csv]
+# python mergeMetadata_bottle.py metadata.xlsx bottle.csv output.xlsx [ecotaxa_output_basename]
+# This will create both [ecotaxa_output_basename].csv and [ecotaxa_output_basename].xlsx
 
 def dmm_to_dd(value):
     if pd.isna(value):
@@ -97,7 +98,7 @@ def merge_metadata_with_bottle(metadata_file, bottle_file, output_file, ecotaxa_
     # This preserves existing CollectionTime values while filling in missing ones
     if 'CollectionTime' in metadata_df.columns:
         # Fill CollectionTime with DateTime values only where CollectionTime is null or empty
-        metadata_df['CollectionTime'] = metadata_df['CollectionTime'].fillna(metadata_df['DateTime'])
+        metadata_df['CollectionTime'] = metadata_df['CollectionTime'].fillna(metadata_df['DateTime']).infer_objects(copy=False)
         # Also handle empty strings
         mask = metadata_df['CollectionTime'].astype(str).str.strip() == ''
         metadata_df.loc[mask, 'CollectionTime'] = metadata_df.loc[mask, 'DateTime']
@@ -181,7 +182,8 @@ def merge_metadata_with_bottle(metadata_file, bottle_file, output_file, ecotaxa_
     # Fill CollectionTime with NMEAtimeUTC values for all niskin samples
     if 'Type' in merged_df.columns and 'NMEAtimeUTC' in merged_df.columns:
         niskin_mask = merged_df['Type'].str.lower() == 'niskin'
-        merged_df.loc[niskin_mask, 'CollectionTime'] = merged_df.loc[niskin_mask, 'NMEAtimeUTC']
+        # Convert to same dtype before assignment to avoid incompatible dtype warning
+        merged_df.loc[niskin_mask, 'CollectionTime'] = merged_df.loc[niskin_mask, 'NMEAtimeUTC'].astype(merged_df['CollectionTime'].dtype)
 
     # Copy DepSM values into Depth column when values exist, and round to nearest integer.
     # Also default inline-type rows to a depth of 2.
@@ -246,10 +248,13 @@ def merge_metadata_with_bottle(metadata_file, bottle_file, output_file, ecotaxa_
 
     # === Create additional output file with CTD temp and sal merged in for Ecotaxa upload ===
     if ecotaxa_file is None:
-        ecotaxa_file = output_file.replace('.xlsx', '-toEcotaxa.xlsx')
+        ecotaxa_file = output_file.replace('.xlsx', '-toEcotaxa')
+    
+    # Remove any extension from ecotaxa_file if present
+    ecotaxa_base = os.path.splitext(ecotaxa_file)[0]
     
     # Create EcoTaxa directory if it doesn't exist
-    ecotaxa_dir = os.path.dirname(ecotaxa_file)
+    ecotaxa_dir = os.path.dirname(ecotaxa_base)
     if ecotaxa_dir and not os.path.isdir(ecotaxa_dir):
         os.makedirs(ecotaxa_dir, exist_ok=True)
     
@@ -262,13 +267,16 @@ def merge_metadata_with_bottle(metadata_file, bottle_file, output_file, ecotaxa_
         # Keep only columns before NMEAtimeUTC
         bottle_data_df = bottle_data_df.iloc[:, :nmea_index]
 
-    # Save the bottle data version
-    bottle_data_df.to_excel(ecotaxa_file, index=False)
-    print(f"✅ Merged metadata with bottle data saved to '{ecotaxa_file}'.")
-
-    # also save a CSV version of bottle data
-    bottle_csv_output_file = ecotaxa_file.replace('.xlsx', '.csv')
-    bottle_data_df.to_csv(bottle_csv_output_file, index=False)
+    # Save the bottle data version in both CSV and Excel formats
+    csv_ecotaxa_file = f"{ecotaxa_base}.csv"
+    excel_ecotaxa_file = f"{ecotaxa_base}.xlsx"
+    
+    bottle_data_df.to_csv(csv_ecotaxa_file, index=False)
+    bottle_data_df.to_excel(excel_ecotaxa_file, index=False)
+    
+    print(f"✅ Merged metadata with bottle data saved to:")
+    print(f"   - {csv_ecotaxa_file}")
+    print(f"   - {excel_ecotaxa_file}")
 
 
 if __name__ == "__main__":

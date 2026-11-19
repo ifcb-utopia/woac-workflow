@@ -10,7 +10,8 @@ import math
 # When there is information in the CollectionTime column of the metadata file, it will be used to match with the GPS data.
 # SampleTime = Name of the timestamp column in the sample metadata file (e.g., "DateTime")
 # Usage:
-# python mergeMetadata_GPS_TSG.py /path/to/gps.xlsx /path/to/tsg.xlsx /path/to/sample.xlsx SampleTime /path/to/output.xlsx
+# python mergeMetadata_GPS_TSG.py /path/to/gps.xlsx /path/to/tsg.xlsx /path/to/sample.xlsx SampleTime /path/to/output_basename
+# This will create /path/to/output_basename.xlsx
 
 
 def dmm_to_dd(dmm, hemisphere=None):
@@ -18,14 +19,25 @@ def dmm_to_dd(dmm, hemisphere=None):
         return np.nan
 
     value = float(dmm)
-    if abs(value) >= 100:
-        degrees = int(abs(value) // 100)
-        minutes = abs(value) - (degrees * 100)
+    abs_value = abs(value)
+    
+    # Detect if already in decimal degrees format
+    # DD format: typically -180 to 180, may have many decimal places (e.g., -122.395588)
+    # DMM format: typically 0-18000 for lon, 0-9000 for lat, with format like DDDMM.MMMM
+    
+    # If the value is > 180, it must be in DMM format (can't be DD)
+    if abs_value > 180:
+        # Definitely in DMM format - convert to DD
+        degrees = int(abs_value // 100)
+        minutes = abs_value - (degrees * 100)
         dd = degrees + (minutes / 60)
     else:
-        dd = value
+        # Already in decimal degrees format
+        dd = abs_value
 
     if hemisphere in ['S', 's', 'W', 'w']:
+        dd = -dd
+    elif value < 0:
         dd = -dd
 
     return dd
@@ -149,10 +161,14 @@ def merge_gps_tsg_metadata(gps_file, tsg_file, sample_file, sample_time_col, out
     if output_dir and not os.path.isdir(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
+    # Remove any extension from output_file if present and add .xlsx
+    output_base = os.path.splitext(output_file)[0]
+    excel_output = f"{output_base}.xlsx"
+    
     # === Output result ===
-    samples_df.to_excel(output_file, index=False)
+    samples_df.to_excel(excel_output, index=False)
 
-    print(f"✅ Matching complete. Output saved to '{output_file}'.")
+    print(f"✅ Matching complete. Output saved to '{excel_output}'.")
 
 
 if __name__ == "__main__":
